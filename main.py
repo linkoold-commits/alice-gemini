@@ -23,8 +23,8 @@ def webhook():
             "version": "1.0"
         })
     
-    # Четкий и стабильный URL версии v1 без лишних повторов
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    # СТРОГО ПРАВИЛЬНЫЙ URL ДЛЯ GEMINI 1.5 FLASH
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     
     payload = {
         "contents": [
@@ -40,11 +40,11 @@ def webhook():
         # Отправляем запрос напрямую в Google
         response = requests.post(url, json=payload, timeout=10)
         
-        # Если сервер вернул ошибку авторизации или блокировки, выведем её статус
+        # Если статус не 200, выводим его для диагностики
         if response.status_code != 200:
             return jsonify({
                 "response": {
-                    "text": f"Гугл вернул статус ошибки {response.status_code}. Возможно, сработала блокировка.",
+                    "text": f"Гугл вернул статус ошибки {response.status_code}.",
                     "end_session": False
                 },
                 "version": "1.0"
@@ -52,17 +52,17 @@ def webhook():
             
         res_data = response.json()
         
-        # Если внутри JSON есть ошибка от самого сервиса
+        # Если внутри JSON есть описание ошибки
         if 'error' in res_data:
             return jsonify({
                 "response": {
-                    "text": f"Гугл ругается: {res_data['error'].get('message', 'Ошибка ключа')}",
+                    "text": f"Гугл ругается: {res_data['error'].get('message', 'Ошибка')}",
                     "end_session": False
                 },
                 "version": "1.0"
             })
             
-        # Забираем текст ответа
+        # Успешный запуск — забираем текст ответа
         reply = res_data['candidates'][0]['content']['parts'][0]['text']
         
     except Exception as e:
