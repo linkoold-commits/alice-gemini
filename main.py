@@ -23,8 +23,8 @@ def webhook():
             "version": "1.0"
         })
     
-    # ПРЯМОЙ официальный адрес Google API (без сторонних шлюзов)
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    # ИСПРАВЛЕННЫЙ ПУТЬ К МОДЕЛИ
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     
     payload = {
         "contents": [
