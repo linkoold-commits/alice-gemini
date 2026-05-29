@@ -4,7 +4,7 @@ import requests
 
 app = Flask(__name__)
 
-# Получаем ваш ключ API из настроек Render
+# Ваш ключ API из настроек Render (тот самый AQ.Ab8RN...)
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 @app.route('/webhook', methods=['POST'])
@@ -13,7 +13,7 @@ def webhook():
     user_text = req.get('request', {}).get('command', '').strip()
     is_new_session = req.get('session', {}).get('new', False)
     
-    # Стартовая реплика при запуске
+    # Стартовый диалог
     if is_new_session or not user_text:
         return jsonify({
             "response": {
@@ -23,8 +23,8 @@ def webhook():
             "version": "1.0"
         })
     
-    # Используем Cloudflare прокси-шлюз
-    url = f"https://gateway.ai.cloudflare.com/v1/public/gemini-proxy/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    # ПРЯМОЙ официальный адрес Google API (без сторонних шлюзов)
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     
     payload = {
         "contents": [
@@ -37,21 +37,25 @@ def webhook():
     }
     
     try:
-        # Отправляем запрос
+        # Отправляем запрос напрямую в Google
         response = requests.post(url, json=payload, timeout=10)
         res_data = response.json()
         
-        # Проверяем, что пришло внутри ответа
-        if 'candidates' in res_data and res_data['candidates']:
-            reply = res_data['candidates'][0]['content']['parts'][0]['text']
-        elif 'error' in res_data:
-            reply = f"Ошибка от Гугла: {res_data['error'].get('message', 'Пустое сообщение')}"
-        else:
-            reply = f"Неизвестный формат ответа. Статус: {response.status_code}"
+        # Если Гугл вернул ошибку, Алиса честно прочитает её текст
+        if 'error' in res_data:
+            return jsonify({
+                "response": {
+                    "text": f"Гугл ругается: {res_data['error'].get('message', 'Ошибка ключа')}",
+                    "end_session": False
+                },
+                "version": "1.0"
+            })
             
+        # Если всё успешно — забираем текст ответа
+        reply = res_data['candidates'][0]['content']['parts'][0]['text']
+        
     except Exception as e:
-        # Если упал сам Python-скрипт
-        reply = f"Системный сбой кода: {str(e)}"
+        reply = f"Ошибка разбора ответа: {str(e)}"
 
     return jsonify({
         "response": {
