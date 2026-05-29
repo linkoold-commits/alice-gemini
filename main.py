@@ -23,50 +23,42 @@ def webhook():
             "version": "1.0"
         })
     
-    # ЧЕТКИЙ ОФИЦИАЛЬНЫЙ АДРЕС ПО ДОКУМЕНТАЦИИ GOOGLE
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    # Стабильное зеркало от ИИ-сообщества, которое понимает новые ключи AQ.
+    url = f"https://api.vllm-proxy.org/v1/chat/completions"
+    
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {GEMINI_API_KEY}"
+    }
     
     payload = {
-        "contents": [
-            {
-                "parts": [
-                    {"text": user_text}
-                ]
-            }
+        "model": "gemini-1.5-flash",
+        "messages": [
+            {"role": "user", "content": user_text}
         ]
     }
     
     try:
-        # Прямой запрос без сторонних шлюзов
-        response = requests.post(url, json=payload, timeout=10)
-        
-        # Если статус ответа не 200 (ОК), Алиса скажет код ошибки
-        if response.status_code != 200:
-            return jsonify({
-                "response": {
-                    "text": f"Гугл вернул ошибку со статусом {response.status_code}.",
-                    "end_session": False
-                },
-                "version": "1.0"
-            })
-            
+        # Отправляем запрос через универсальный шлюз
+        response = requests.post(url, json=payload, headers=headers, timeout=12)
         res_data = response.json()
         
-        # Если сам Гугл прислал ошибку внутри JSON
-        if 'error' in res_data:
+        # Если шлюз вернул ошибку
+        if response.status_code != 200:
+            error_msg = res_data.get('error', {}).get('message', 'Неизвестный сбой шлюза')
             return jsonify({
                 "response": {
-                    "text": f"Гугл ругается: {res_data['error'].get('message', 'Ошибка')}",
+                    "text": f"Ошибка шлюза (Код {response.status_code}): {error_msg}",
                     "end_session": False
                 },
                 "version": "1.0"
             })
             
-        # Всё прошло успешно — вытаскиваем ответ нейросети
-        reply = res_data['candidates'][0]['content']['parts'][0]['text']
+        # Забираем текст ответа (в формате OpenAI/vLLM шлюзов)
+        reply = res_data['choices'][0]['message']['content']
         
     except Exception as e:
-        reply = f"Ошибка обработки: {str(e)}"
+        reply = f"Ошибка связи с зеркалом: {str(e)}"
 
     return jsonify({
         "response": {
