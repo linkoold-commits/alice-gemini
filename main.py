@@ -4,7 +4,7 @@ import requests
 
 app = Flask(__name__)
 
-# Забираем ваш ключ API из настроек Render
+# Получаем ваш ключ API из настроек Render
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 @app.route('/webhook', methods=['POST'])
@@ -13,7 +13,7 @@ def webhook():
     user_text = req.get('request', {}).get('command', '').strip()
     is_new_session = req.get('session', {}).get('new', False)
     
-    # Стартовый диалог
+    # Стартовая реплика при запуске
     if is_new_session or not user_text:
         return jsonify({
             "response": {
@@ -23,8 +23,8 @@ def webhook():
             "version": "1.0"
         })
     
-    # Прямой URL к API через стабильное зеркало для обхода блокировок
-    url = f"https://generativelanguage.proxy.ustclug.org/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    # Альтернативное стабильное зеркало для работы с новыми ключами AQ.Ab8RN
+    url = f"https://gateway.ai.cloudflare.com/v1/public/gemini-proxy/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     
     payload = {
         "contents": [
@@ -37,18 +37,21 @@ def webhook():
     }
     
     try:
-        # Отправляем запрос напрямую
+        # Отправляем POST запрос
         response = requests.post(url, json=payload, timeout=10)
         res_data = response.json()
         
-        # Вытаскиваем текст ответа из структуры Google API
-        reply = res_data['candidates'][0]['content']['parts'][0]['text']
+        # Проверяем структуру ответа
+        if 'candidates' in res_data and res_data['candidates']:
+            reply = res_data['candidates'][0]['content']['parts'][0]['text']
+        elif 'error' in res_data:
+            reply = f"Ошибка API: {res_data['error'].get('message', 'Неизвестный сбой')}"
+        else:
+            reply = "Не удалось распознать ответ от нейросети. Попробуйте еще раз."
+            
     except Exception as e:
-        # Ошибка выведется в логи Render, если что-то не так с ключом
         print(f"!!! CRITICAL ERROR: {str(e)}")
-        if 'res_data' in locals():
-            print(f"!!! API RESPONSE: {res_data}")
-        reply = "Извините, произошла ошибка при обработке запроса нейросетью. Попробуйте еще раз."
+        reply = "Произошла ошибка при обработке запроса. Попробуйте повторить чуть позже."
 
     return jsonify({
         "response": {
