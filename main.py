@@ -1,26 +1,19 @@
 import os
 from flask import Flask, request, jsonify
 import google.generativeai as genai
+from google.api_core import client_options
 
 app = Flask(__name__)
 
-# Авторизация
+# Берем ваш новый ключ (который AQ.Ab8RN...)
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-genai.configure(api_key=GEMINI_API_KEY)
 
-# Настройки безопасности (отключаем лишние блокировки для стабильности)
-safety_settings = [
-    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-]
+# Настраиваем обход блокировки через официальное зеркало
+options = client_options.ClientOptions(api_endpoint="https://generativelanguage.proxy.ustclug.org")
+genai.configure(api_key=GEMINI_API_KEY, client_options=options)
 
-# Используем самую актуальную и быструю модель
-model = genai.GenerativeModel(
-    model_name='gemini-1.5-flash',
-    safety_settings=safety_settings
-)
+# Подключаем модель
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
@@ -29,21 +22,18 @@ def webhook():
     is_new_session = req.get('session', {}).get('new', False)
     
     if is_new_session or not user_text:
-        reply = "Привет! На связи Gemini. О чем вы хотите меня спросить?"
+        reply = "Привет! На связи Джеминай. О чем вы хотите меня спросить?"
     else:
         try:
-            # Запрос к Google
+            # Запрос к зеркалу Gemini
             response = model.generate_content(user_text)
-            
-            # Проверяем, есть ли вообще текст в ответе
-            if response.text:
+            if response and response.text:
                 reply = response.text
             else:
-                reply = "Джеминай вернул пустой ответ. Попробуйте перефразировать вопрос."
+                reply = "Джеминай не смог сгенерировать ответ. Попробуйте еще раз."
         except Exception as e:
-            # Выводим РЕАЛЬНУЮ причину в логи Render
             print(f"!!! REAL GEMINI ERROR: {str(e)}")
-            reply = "Извините, произошла ошибка при обращении к Gemini. Попробуйте еще раз."
+            reply = "Произошла ошибка при обращении к Джеминай. Попробуйте повторить запрос."
 
     return jsonify({
         "response": {
