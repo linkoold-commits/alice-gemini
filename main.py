@@ -45,22 +45,10 @@ def webhook():
         if 'candidates' in res_data and res_data['candidates']:
             reply = res_data['candidates'][0]['content']['parts'][0]['text']
         elif 'error' in res_data:
-            reply = f"Ошибка API: {res_data['error'].get('message', 'Неизвестный сбой')}"
+            reply = f"Ошибка от Гугла: {res_data['error'].get('message', 'Пустое сообщение ошибки')}"
         else:
-            reply = "Не удалось распознать ответ от нейросети. Попробуйте еще раз."
+            reply = f"Неизвестный формат ответа. Статус ответа: {response.status_code}"
             
     except Exception as e:
-        print(f"!!! CRITICAL ERROR: {str(e)}")
-        reply = "Произошла ошибка при обработке запроса. Попробуйте повторить чуть позже."
-
-    return jsonify({
-        "response": {
-            "text": reply,
-            "end_session": False
-        },
-        "version": "1.0"
-    })
-
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+        # Алиса сама скажет, почему Python споткнулся
+        reply = f"Системный сбой кода: {str(e)}"
