@@ -4,35 +4,29 @@ import google.generativeai as genai
 
 app = Flask(__name__)
 
-# Берем API-ключ из настроек сервера (для безопасности)
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 
-# Используем быструю и актуальную модель
-model = genai.GenerativeModel('gemini-1.5-flash')
+# Используем базовую стабильную модель
+model = genai.GenerativeModel('gemini-pro')
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
     req = request.json
-    
-    # Проверяем, есть ли текст от пользователя
     user_text = req.get('request', {}).get('command', '').strip()
-    
-    # Проверяем, это первый запуск навыка или продолжение диалога
     is_new_session = req.get('session', {}).get('new', False)
     
     if is_new_session or not user_text:
         reply = "Привет! На связи Gemini. О чем вы хотите меня спросить?"
     else:
         try:
-            # Отправляем запрос в нейросеть Google
             response = model.generate_content(user_text)
             reply = response.text
         except Exception as e:
+            # Это покажет реальную ошибку в консоли Render
+            print(f"!!! REAL GEMINI ERROR: {e}")
             reply = "Извините, произошла ошибка при обращении к Gemini. Попробуйте еще раз."
-            print(f"Error: {e}")
 
-    # Формируем правильный ответ для Алисы, чтобы она не закрывала сессию
     return jsonify({
         "response": {
             "text": reply,
