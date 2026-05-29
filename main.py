@@ -23,7 +23,7 @@ def webhook():
             "version": "1.0"
         })
     
-    # Альтернативное стабильное зеркало для работы с новыми ключами AQ.Ab8RN
+    # Используем Cloudflare прокси-шлюз
     url = f"https://gateway.ai.cloudflare.com/v1/public/gemini-proxy/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     
     payload = {
@@ -37,18 +37,30 @@ def webhook():
     }
     
     try:
-        # Отправляем POST запрос
+        # Отправляем запрос
         response = requests.post(url, json=payload, timeout=10)
         res_data = response.json()
         
-        # Проверяем структуру ответа
+        # Проверяем, что пришло внутри ответа
         if 'candidates' in res_data and res_data['candidates']:
             reply = res_data['candidates'][0]['content']['parts'][0]['text']
         elif 'error' in res_data:
-            reply = f"Ошибка от Гугла: {res_data['error'].get('message', 'Пустое сообщение ошибки')}"
+            reply = f"Ошибка от Гугла: {res_data['error'].get('message', 'Пустое сообщение')}"
         else:
-            reply = f"Неизвестный формат ответа. Статус ответа: {response.status_code}"
+            reply = f"Неизвестный формат ответа. Статус: {response.status_code}"
             
     except Exception as e:
-        # Алиса сама скажет, почему Python споткнулся
+        # Если упал сам Python-скрипт
         reply = f"Системный сбой кода: {str(e)}"
+
+    return jsonify({
+        "response": {
+            "text": reply,
+            "end_session": False
+        },
+        "version": "1.0"
+    })
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
