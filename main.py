@@ -4,7 +4,7 @@ import requests
 
 app = Flask(__name__)
 
-# Ваш ключ API из настроек Render (тот самый AQ.Ab8RN...)
+# Ваш ключ API из настроек Render
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 @app.route('/webhook', methods=['POST'])
@@ -23,8 +23,8 @@ def webhook():
             "version": "1.0"
         })
     
-    # ИСПРАВЛЕННЫЙ ПУТЬ К МОДЕЛИ
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    # Четкий и стабильный URL версии v1 без лишних повторов
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     
     payload = {
         "contents": [
@@ -39,9 +39,20 @@ def webhook():
     try:
         # Отправляем запрос напрямую в Google
         response = requests.post(url, json=payload, timeout=10)
+        
+        # Если сервер вернул ошибку авторизации или блокировки, выведем её статус
+        if response.status_code != 200:
+            return jsonify({
+                "response": {
+                    "text": f"Гугл вернул статус ошибки {response.status_code}. Возможно, сработала блокировка.",
+                    "end_session": False
+                },
+                "version": "1.0"
+            })
+            
         res_data = response.json()
         
-        # Если Гугл вернул ошибку, Алиса честно прочитает её текст
+        # Если внутри JSON есть ошибка от самого сервиса
         if 'error' in res_data:
             return jsonify({
                 "response": {
@@ -51,7 +62,7 @@ def webhook():
                 "version": "1.0"
             })
             
-        # Если всё успешно — забираем текст ответа
+        # Забираем текст ответа
         reply = res_data['candidates'][0]['content']['parts'][0]['text']
         
     except Exception as e:
