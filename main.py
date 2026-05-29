@@ -4,7 +4,7 @@ import requests
 
 app = Flask(__name__)
 
-# Ваш ключ API из настроек Render (тот самый AQ.Ab8RN...)
+# Ваш ключ API из настроек Render (AQ.Ab8RN...)
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 @app.route('/webhook', methods=['POST'])
@@ -23,19 +23,8 @@ def webhook():
             "version": "1.0"
         })
     
-    # Стабильный альтернативный эндпоинт, переваривающий ключи AQ.
-    url = "https://api.siliconflow.cn/v1/chat/completions"
-    
-    # Если ключ новый, мы пустим запрос через универсальный шлюз, 
-    # но чтобы не рисковать, вернемся к проверенному прокси-запросу, 
-    # изменив структуру на совместимую с OpenAI/Gemini шлюзами:
-    
-    url_gemini = f"https://proxy.cors.sh/https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-    
-    headers = {
-        "Content-Type": "application/json",
-        "x-cors-api-key": "temp_8e076df35b430bc8f75269229712a233" # Временный шлюз для проброса
-    }
+    # ЧЕТКИЙ ОФИЦИАЛЬНЫЙ АДРЕС ПО ДОКУМЕНТАЦИИ GOOGLE
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     
     payload = {
         "contents": [
@@ -48,33 +37,36 @@ def webhook():
     }
     
     try:
-        # Шлем запрос через CORS-прокси шлюз, который скрывает, что запрос идет от Render
-        response = requests.post(url_gemini, json=payload, headers=headers, timeout=10)
-        res_data = response.json()
+        # Прямой запрос без сторонних шлюзов
+        response = requests.post(url, json=payload, timeout=10)
         
-        if 'error' in res_data:
+        # Если статус ответа не 200 (ОК), Алиса скажет код ошибки
+        if response.status_code != 200:
             return jsonify({
                 "response": {
-                    "text": f"Шлюз выдал ошибку: {res_data['error'].get('message', 'Ошибка конфигурации')}",
+                    "text": f"Гугл вернул ошибку со статусом {response.status_code}.",
                     "end_session": False
                 },
                 "version": "1.0"
             })
             
-        # Забираем текст ответа
+        res_data = response.json()
+        
+        # Если сам Гугл прислал ошибку внутри JSON
+        if 'error' in res_data:
+            return jsonify({
+                "response": {
+                    "text": f"Гугл ругается: {res_data['error'].get('message', 'Ошибка')}",
+                    "end_session": False
+                },
+                "version": "1.0"
+            })
+            
+        # Всё прошло успешно — вытаскиваем ответ нейросети
         reply = res_data['candidates'][0]['content']['parts'][0]['text']
         
     except Exception as e:
-        # Если не получилось, попробуем сделать через резервный абсолютно свободный прокси-шлюз
-        try:
-            backup_url = f"https://api.allorigins.win/get?url={requests.utils.quote(url_gemini)}"
-            backup_res = requests.get(backup_url, timeout=10)
-            backup_data = backup_res.json()
-            import json
-            real_data = json.loads(backup_data['contents'])
-            reply = real_data['candidates'][0]['content']['parts'][0]['text']
-        except Exception as backup_e:
-            reply = f"Ошибка на всех линиях связи. Код сбоя: {str(e)}"
+        reply = f"Ошибка обработки: {str(e)}"
 
     return jsonify({
         "response": {
